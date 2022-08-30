@@ -7,7 +7,7 @@ output: html_document
 
 ```{r}
 #library(measurements)
-# cameras <- read_csv("SL_camera_sites_2018_2021.csv") %>% 
+# cameras <- read_csv("data/SL_camera_sites_2018_2021.csv") %>% 
 #   mutate(latitude = conv_unit(northing, from = "deg_min_sec", to = "dec_deg") %>% as.numeric(),
 #          longitude = conv_unit(easting, from = "deg_min_sec", to = "dec_deg") %>% as.numeric()) 
 # 
@@ -21,7 +21,7 @@ cameras <- read_csv("SL_camera_sites_2018_2021.csv") %>%
   drop_na(latitude)
 
 cameras <- st_as_sf(cameras, coords = c("longitude", "latitude"), crs = 4326)
-st_write(cameras, "camera_locations.shp")
+st_write(cameras, "data/camera_locations.shp")
 ```
 
 
