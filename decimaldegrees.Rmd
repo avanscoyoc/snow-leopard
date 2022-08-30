@@ -1,0 +1,27 @@
+---
+title: "decimal"
+author: "Amy Van Scoyoc"
+date: "8/29/2022"
+output: html_document
+---
+
+```{r}
+#library(measurements)
+# cameras <- read_csv("SL_camera_sites_2018_2021.csv") %>% 
+#   mutate(latitude = conv_unit(northing, from = "deg_min_sec", to = "dec_deg") %>% as.numeric(),
+#          longitude = conv_unit(easting, from = "deg_min_sec", to = "dec_deg") %>% as.numeric()) 
+# 
+# write_csv(cameras, "SL_camera_sites_2018_2021.csv")
+
+library(tidyverse)
+library(sf)
+
+cameras <- read_csv("SL_camera_sites_2018_2021.csv") %>% 
+  select(-c("northing","easting")) %>% 
+  drop_na(latitude)
+
+cameras <- st_as_sf(cameras, coords = c("longitude", "latitude"), crs = 4326)
+st_write(cameras, "camera_locations.shp")
+```
+
+
