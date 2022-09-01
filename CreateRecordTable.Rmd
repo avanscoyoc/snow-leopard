@@ -1,0 +1,94 @@
+---
+title: "CreateRecordTable"
+author: "Amy Van Scoyoc"
+date: "9/1/2022"
+output: github_document
+---
+
+# Libraries
+
+```{r}
+library(tidyverse) # for basic data wrangling
+library(camtrapR) # for creating species record tables
+```
+
+# Create recordTable in camtrapR from raw folders
+
+Before making the record table, make sure that the spelling, capitalization, and punctuation of species names are identical across camera folders, to avoid headaches down the road. 
+
+```{r checking folder names, eval=FALSE}
+setwd("/Volumes/SCIDAT_HD/SnowLeopard")
+list.dirs(full.names = FALSE) -> folder_names
+
+folder_names %>% 
+  str_extract(pattern = "([^/]+$)") %>% 
+  unique() %>% 
+  as_tibble() %>% 
+  arrange(desc(value))
+```
+
+
+The following code will create a record table csv with the camera, species, date, and time of every photograph taken, excluding images of nothing ("Blank").
+
+```{r create recordTable, eval = F}
+#Only need to run this once to create the record table, can read it in later
+# set working directory as the folder with the camera folders in it
+setwd("/Volumes/SCIDAT_HD/SnowLeopard/")
+
+
+# create record table
+record.table.all <- recordTable(inDir = "Data-21-22", # folder with the camera folders in it
+                        IDfrom = "directory", # indicates that species ID corresponds to folder name
+                        exclude = c("Blank"), # exclude Ghosts
+                        timeZone = "Etc/GMT+5", # use OlsonNames()
+                        #stationCol = "Camera_folder", # name of the station in output file
+                        video = list(file_formats = c("jpg", "mov", "avi", "mp4"),
+                                      dateTimeTag = "FileModifyDate"), # to read files
+                        writecsv = FALSE,
+                        removeDuplicateRecords = TRUE) # removes records where there were multiple images in the same second; will be important later for subsetting images by 15 min or 60 sec or whatever
+
+###issue with videos###
+
+#there is stuff from all years in here...
+#.AVI metadata is 13 hours earlier than timestamp on video (video correct)
+#.MP4 metadata looks correct but timestamp on video is 13 hours off (metadata correct)
+#.JPG metadata looks correct and matches timestamp
+#exifTagNames(fileName = "")
+```
+
+```{r}
+# export raw record table, to have for later
+write.csv(record.table.all, "Data-21-22_Record_Table.csv", row.names = FALSE)
+
+#Once the record table has been exported, avoid opening and editing the file in Excel!! 
+# It will change the formatting of the date and time column, and R will no longer read it as a date and time (but as a string). You can correct this with as.POSIXct() if need be, but better to just not have to deal with it.
+```
+
+# Examine record table
+
+```{r}
+#which species are most common?
+record.table.all %>% 
+  group_by(Species) %>% 
+  summarise(n_det = n()) %>% 
+  mutate(sum(n_det)) %>% 
+  arrange(desc(n_det))
+
+#How many species per station? How long were cameras operating?
+record.table.all %>% 
+  group_by(Station) %>% 
+  summarise(n_spp = n_distinct(Species), 
+            n_detections = n(), 
+            min_date = min(Date), 
+            max_date = max(Date), 
+            n_days = n_distinct(Date)) %>% 
+  arrange(desc(n_detections))
+
+#what proportion of cameras are species on?
+record.table.all %>% 
+  group_by(Station, Species) %>% 
+  count() %>% 
+  ungroup() %>% 
+  count(Species) %>% 
+  arrange(desc(n))
+```
