@@ -14,23 +14,27 @@ library(sf) #converting to shapefile for earth engine covariate layers
 
 ```{r}
 #convert to decimal degrees, format dates, n_days in operation
-cameras <- read_csv("data/SL_camera_sites_2018_2021.csv") %>%
-  mutate(latitude = conv_unit(northing, from = "deg_min_sec", to = "dec_deg") %>% as.numeric(),
-         longitude = conv_unit(easting, from = "deg_min_sec", to = "dec_deg") %>% as.numeric(), 
-         set_date = as.Date(start, format = "%m/%d/%y"),
-         close_date = as.Date(end, format = "%m/%d/%y"), 
+cameras <- read_csv("data/camerasites_2021_2022.csv") %>%
+  mutate(latitude = conv_unit(northing,from = "deg_min_sec", to = "dec_deg") %>% as.numeric(),
+         longitude = conv_unit(easting,from = "deg_min_sec", to = "dec_deg") %>% as.numeric(), 
+         set_date = as.Date(start, format = "%d/%m/%Y"),
+         close_date = as.Date(end, format = "%d/%m/%Y"),
          n_days = close_date - set_date) %>% 
-  select(camera, location, village, longitude, latitude, set_date, close_date, n_days, elevation)
+  select(camera,longitude, latitude, set_date, close_date, n_days, elevation_m)
 ```
 
 
 ```{r}
 #save as csv for occupancy model
-write_csv(cameras, "data/cameratraps.csv")
+cameras %>% 
+  filter(camera != "SLC 201-Hushe-UNKNOWN") %>%
+  write_csv(., "data/cameratraps.csv")
 
 #save as shapefile for getting site boundary for covariates
-cameras <- st_as_sf(cameras, coords = c("longitude", "latitude"), crs = 4326)
-st_write(cameras, "data/camera_locations.shp")
+cameras %>% 
+  filter(camera != "SLC 201-Hushe-UNKNOWN") %>% #remove missing camera
+  st_as_sf(., coords = c("longitude", "latitude"), crs = 4326) %>% 
+  st_write(., "data/camera_locations.shp", append=FALSE)
 ```
 
 
