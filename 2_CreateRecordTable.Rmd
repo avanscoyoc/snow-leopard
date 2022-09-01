@@ -37,9 +37,11 @@ setwd("/Volumes/SCIDAT_HD/SnowLeopard/")
 
 
 # create record table
-record.table.all <- recordTable(inDir = "Data-21-22", # folder with the camera folders in it
+record_table <- recordTable(inDir = "Data-21-22", # folder with the camera folders in it
                         IDfrom = "directory", # indicates that species ID corresponds to folder name
                         exclude = c("Blank"), # exclude Ghosts
+                        minDeltaTime = 30, # create as independent detections
+                        deltaTimeComparedTo = "lastIndependentRecord",
                         timeZone = "Etc/GMT+5", # use OlsonNames()
                         #stationCol = "Camera_folder", # name of the station in output file
                         video = list(file_formats = c("jpg", "mov", "avi", "mp4"),
@@ -58,7 +60,7 @@ record.table.all <- recordTable(inDir = "Data-21-22", # folder with the camera f
 
 ```{r}
 # export raw record table, to have for later
-write.csv(record.table.all, "Data-21-22_Record_Table.csv", row.names = FALSE)
+write.csv(record_table, "data/Data-21-22_Record_Table.csv", row.names = FALSE)
 
 #Once the record table has been exported, avoid opening and editing the file in Excel!! 
 # It will change the formatting of the date and time column, and R will no longer read it as a date and time (but as a string). You can correct this with as.POSIXct() if need be, but better to just not have to deal with it.
@@ -68,14 +70,14 @@ write.csv(record.table.all, "Data-21-22_Record_Table.csv", row.names = FALSE)
 
 ```{r}
 #which species are most common?
-record.table.all %>% 
+record_table %>% 
   group_by(Species) %>% 
   summarise(n_det = n()) %>% 
   mutate(sum(n_det)) %>% 
   arrange(desc(n_det))
 
 #How many species per station? How long were cameras operating?
-record.table.all %>% 
+record_table %>% 
   group_by(Station) %>% 
   summarise(n_spp = n_distinct(Species), 
             n_detections = n(), 
@@ -85,10 +87,24 @@ record.table.all %>%
   arrange(desc(n_detections))
 
 #what proportion of cameras are species on?
-record.table.all %>% 
+record_table %>% 
   group_by(Station, Species) %>% 
   count() %>% 
   ungroup() %>% 
   count(Species) %>% 
   arrange(desc(n))
 ```
+
+# Activity: Kernel Density Estimation
+
+```{r}
+activityDensity(recordTable = record_table,
+                species     = "Snow Leopard")
+activityDensity(recordTable = record_table,
+                species     = "Fox")
+activityDensity(recordTable = record_table,
+                species     = "Markhor")
+activityDensity(recordTable = record_table,
+                species     = "Livestock")
+```
+

@@ -1,0 +1,107 @@
+---
+title: "Occupancy_SSOM"
+author: "Amy Van Scoyoc"
+date: "9/1/2022"
+output: github_document
+---
+
+```{r}
+record_table <- read.csv("data/Data-21-22_Record_Table.csv") #import record table
+camtraps <- read.csv("data/SL_camera_sites_2018_2021.csv")
+```
+
+```{r}
+# spatial location of detections
+
+#subset record table
+record_table_SL <- recordTableSample[record_table$Species == "Snow Leopard",]
+ 
+SL_detections <- detectionMaps(CTtable      = camtraps,
+                           recordTable   = record_table_SL,
+                           Xcol          = "utm_x",
+                           Ycol          = "utm_y",
+                           stationCol    = "Station",
+                           speciesCol    = "Species",
+                           speciesToShow = "Snow Leopard", #add if number detections
+                           printLabels   = TRUE,
+                           richnessPlot  = FALSE, #T if richness for all species
+                           speciesPlots  = TRUE, #T if number of detections for one species
+                           addLegend     = TRUE)
+```
+
+```{r}
+# create camera operation matrix
+camop_no_problem <- cameraOperation(CTtable      = camtraps,
+                                    stationCol   = "camera",
+                                    setupCol     = "start",
+                                    retrievalCol = "end",
+                                    hasProblems  = FALSE,
+                                    dateFormat   = dateFormat)
+```
+
+
+```{r}
+# create detection history (with trapping effort)
+det_hist <- detectionHistory(recordTable         = record_table,
+                            camOp                = camop_no_problem,
+                            stationCol           = "Station",
+                            speciesCol           = "Species",
+                            recordDateTimeCol    = "DateTimeOriginal",
+                            species              = "Snow Leopard",
+                            occasionLength       = 7,
+                            day1                 = "station",
+                            includeEffort        = T, #T if trap effort influences detection
+                            scaleEffort          = TRUE) #to help with convergence of models
+```
+
+# Occupancy model in unmarked
+
+```{r}
+library(unmarked)
+```
+
+### Site covariates
+```{r}
+site <- 
+```
+
+### Detection covariates
+```{r}
+obs <- 
+```
+
+### Create unmarked dataframe
+```{r}
+wt = unmarkedFrameOccu(y = det_hist, siteCovs = site, obsCovs = obs)
+summary(wt)
+```
+
+### Run occupancy model
+```{r}
+model1 = occu(~ date + dates.2 + mins + mins.2 ~ siteCovs, data = wt)
+summary(model1)
+```
+
+### Backtransform
+```{r}
+backTransform(linearComb(model1, coefficients = c(1,1),"state")) #update coeff & "state/det"
+```
+
+### Plot
+```{r}
+# Plotting habitat occupancy probability
+newdata1 <- data.frame(siteCovs=c("Edge", "Interior"), date = 0,dates.2 = 0,mins = 0,mins.2 = 0)
+
+#Make simulated data for the predict function 
+simdat <- predict(model1, type="state", newdata=newdata1)
+
+with(simdat,{
+  plot(1:2, Predicted, xaxt="n", xlim=c(0.5, 2.5),ylim = c(0,1),
+       xlab="Habitat",
+       ylab=expression(paste("Probability of occurrence (", psi, ")")),
+       cex.lab=1.2,
+       pch=16, cex=1.5, main = "Probability of Occupancy for Each Habitat")
+  axis(1, 1:2, c('Interior', 'Edge'))
+  arrows(1:2, lower, 1:2, upper, angle=90, code=3, length=0.05)})
+```
+
