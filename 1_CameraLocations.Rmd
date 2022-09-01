@@ -20,19 +20,19 @@ cameras <- read_csv("data/camerasites_2021_2022.csv") %>%
          set_date = as.Date(start, format = "%d/%m/%Y"),
          close_date = as.Date(end, format = "%d/%m/%Y"),
          n_days = close_date - set_date) %>% 
-  select(camera,longitude, latitude, set_date, close_date, n_days, elevation_m)
+  select(Station=camera,longitude, latitude, set_date, close_date, n_days, elevation_m)
 ```
 
 
 ```{r}
 #save as csv for occupancy model
 cameras %>% 
-  filter(camera != "SLC 201-Hushe-UNKNOWN") %>%
+  filter(Station != "SLC 201-Hushe-UNKNOWN") %>%
   write_csv(., "data/cameratraps.csv")
 
 #save as shapefile for getting site boundary for covariates
 cameras %>% 
-  filter(camera != "SLC 201-Hushe-UNKNOWN") %>% #remove missing camera
+  filter(Station != "SLC 201-Hushe-UNKNOWN") %>% #remove missing camera
   st_as_sf(., coords = c("longitude", "latitude"), crs = 4326) %>% 
   st_write(., "data/camera_locations.shp", append=FALSE)
 ```

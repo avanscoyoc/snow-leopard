@@ -7,19 +7,20 @@ output: github_document
 
 ```{r}
 record_table <- read.csv("data/Data-21-22_Record_Table.csv") #import record table
-camtraps <- read.csv("data/SL_camera_sites_2018_2021.csv")
+camtraps <- read.csv("data/cameratraps.csv") #import camera site locations
 ```
+
 
 ```{r}
 # spatial location of detections
 
 #subset record table
-record_table_SL <- recordTableSample[record_table$Species == "Snow Leopard",]
+record_table_SL <- record_table[record_table$Species == "Snow Leopard",]
  
-SL_detections <- detectionMaps(CTtable      = camtraps,
+SL_detections <- detectionMaps(CTtable   = camtraps,
                            recordTable   = record_table_SL,
-                           Xcol          = "utm_x",
-                           Ycol          = "utm_y",
+                           Xcol          = "longitude",
+                           Ycol          = "latitude",
                            stationCol    = "Station",
                            speciesCol    = "Species",
                            speciesToShow = "Snow Leopard", #add if number detections
@@ -29,14 +30,15 @@ SL_detections <- detectionMaps(CTtable      = camtraps,
                            addLegend     = TRUE)
 ```
 
+
 ```{r}
 # create camera operation matrix
 camop_no_problem <- cameraOperation(CTtable      = camtraps,
-                                    stationCol   = "camera",
-                                    setupCol     = "start",
-                                    retrievalCol = "end",
+                                    stationCol   = "Station",
+                                    setupCol     = "set_date",
+                                    retrievalCol = "close_date",
                                     hasProblems  = FALSE,
-                                    dateFormat   = dateFormat)
+                                    dateFormat   = "%Y-%m-%d")
 ```
 
 
@@ -74,7 +76,7 @@ obs <-
 ```{r}
 wt = unmarkedFrameOccu(y = det_hist, siteCovs = site, obsCovs = obs)
 summary(wt)
-```
+``` 
 
 ### Run occupancy model
 ```{r}
