@@ -1,0 +1,46 @@
+---
+title: "5_Co-occurence"
+author: "Amy Van Scoyoc"
+date: "8/24/2023"
+output: html_document
+---
+
+
+
+```{r}
+# create detection history (with trapping effort)
+det_hist_lvstk <- detectionHistory(recordTable   = record_table,
+                            camOp                = camop_no_problem,
+                            stationCol           = "Station",
+                            speciesCol           = "Species",
+                            recordDateTimeCol    = "DateTimeOriginal",
+                            species              = "Livestock",
+                            occasionLength       = 7,
+                            day1                 = "station",
+                            includeEffort        = T, #T if trap effort influences detection
+                            scaleEffort          = TRUE) #to help with convergence of models
+
+det_hist_lvstk <- as.data.frame(det_hist_lvstk) 
+View(det_hist_lvstk)
+```
+
+```{r}
+y = list(as.matrix(det_hist_lvstk[,c(1:21)]), as.matrix(det_hist_sl[,c(1:21)]))
+```
+
+
+```{r}
+lvstk_sl_frame <- unmarkedFrameOccuMulti(y = y, siteCovs = data.frame(elev = covariates$elvtn_m,
+                   slope = covariates$slope,
+                   d_corral = covariates$d_corral, 
+                   d_setmt = covariates$d_setmt,
+                   ndvi = covariates$ndvi,
+                   prey = covariates$prey_rai,
+                   lvstk_occ = as.factor(covariates$lvstk_occ),
+                   n_days = covariates$n_days))
+```
+
+```{r}
+Null <- occuMulti(c("~n_days","~n_days"), c("~d_setmt + d_corral", "~prey + d_corral", "~1"), data = lvstk_sl_frame)
+```
+

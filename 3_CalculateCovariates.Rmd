@@ -7,149 +7,78 @@ output: github_document
 
 # Covariate Calculations
 
-The camera site locations
 ```{r}
-sitelocs <- read.csv("Site_Locs.csv")
-st_as_sf(sitelocs, coords = c("Longitude", "Latitude"), crs = 4326) %>% 
-st_transform(26910) -> sites_sf #it will probably need to be in the same coords as the other layers
+library(tidyverse)
+library(raster)
+library(sf)
+#install.packages("exactextractr")
+library(exactextractr)
 ```
 
-Cannabis
 ```{r}
-cannabis_2016 <- st_read("../UsefulSpatialLayers/Cannabis_2016/Cannabis_2016_C1_all.shp")
-
-#Need to make sure that the grows from the study itself are also included...
-grows <- read.csv("Grow_Locs.csv")
-
-grows %>% 
-  rename(ID = Grows) -> grows
-st_as_sf(grows, coords = c("Lon", "Lat"), crs = 4326) %>% 
-st_transform(26910) -> grows_sf
-
-#have to be the same type to bind together
-cannabis_2016 %>% 
-  st_centroid() %>% 
-  select(ID) %>% 
-  rbind(grows_sf) -> all_cannabis
-```
-
-Land cover
-```{r}
-NLCD_2016 <- raster::raster("../UsefulSpatialLayers/Land_Cover/NLCD_JOCO/NLCD_2016_Land_Cover_L48_20190424_hJhopbp8dVByP4bBdB4q.tiff")
-
-NLCD_key <- read_csv("../UsefulSpatialLayers/Land_Cover/NLCD2016_key.csv")
-```
-
-Rivers/Streams
-```{r}
-NHD <- st_read("../Ch2/Layers/JOCO_NHDplus_Flowline/JOCO_NHDplus_Flowline.shp")
-NHD %>% st_zm() -> NHD
-```
-
-Elevation
-```{r}
-DEM_10m <- raster::raster("../Ch2/Layers/JOCO_DEM10m/JOCO_DEM10m_proj.tif")
-```
-
-Canopy cover
-```{r}
-cancov <- raster::raster("../UsefulSpatialLayers/GNN_cancov/rasters/cancov_2017.tif")
-```
-
-Roads
-```{r}
-highways <- read_sf("../UsefulSpatialLayers/Hwys_extract/Hwys_JoCo_clip.shp")
-highways %>% 
-  select(HWYNAME, ST_HWY_IDX) %>% 
-  st_transform(26910) -> highways
-```
-
-Clearcut
-```{r}
-clearcuts <- read_sf("../UsefulSpatialLayers/Wilderville_Clearcuts/Wilderville_Clearcuts.kml")
-
-clearcuts %>% 
-  select(Name) %>% 
-  st_zm() %>% 
-  st_transform(26910) -> clearcuts
+cameras_shp <- st_read("data/camera_locations.shp") #import camera site locations
 ```
 
 
-## Calculate
+```{r}
+setwd("data/covariates/")
+
+elevation <- raster("SL_elevation.tif")
+slope <- raster("SL_slope.tif")
+# water <- raster("SL_water.tif")
+# hf <- raster("SL_humanfootprint.tif")
+d_corral <- raster("d_corral.tif")
+ndvi <- raster("SL_NDVI.tiff")
+d_setmt <- raster("d_settlement.tif")
+prey <- read_csv("prey_rai.csv")
+```
+## For distance to corrals
 
 Custom function for calculating near distances
 ```{r}
-Calculate_Near <- function(input_feature, near_feature) {
-  Near_index <- st_nearest_feature(input_feature, near_feature)
-  sliced <- near_feature %>% slice(Near_index)
-  near_distance <- st_distance(input_feature, sliced, by_element = TRUE)
-  return(near_distance)
-}
+# Calculate_Near <- function(input_feature, near_feature) {
+#   Near_index <- st_nearest_feature(input_feature, near_feature)
+#   sliced <- near_feature %>% slice(Near_index)
+#   near_distance <- st_distance(input_feature, sliced, by_element = TRUE)
+#   return(near_distance)
+# }
 ```
 
-Polygon calculations
+Calculations
 ```{r}
-sites_sf %>% 
-  mutate(dist_cannabis = Calculate_Near(sites_sf, all_cannabis),
-         dist_NHD = Calculate_Near(sites_sf, NHD),
-         dist_clearcut = Calculate_Near(sites_sf, clearcuts),
-         dist_hwys = Calculate_Near(sites_sf, highways)) -> CamLocs_dists
+# covariates <- cameras_shp %>%
+#   mutate(dist_corrals = Calculate_Near(cameras_shp, corrals),
+#          elev = raster::extract(elevation, .),
+#          slope = raster::extract(slope, .))
 ```
 
-Raster calculations
+Livestock Density
 ```{r}
-# CamLocs_dists %>% 
-#   mutate(elev = raster::extract(DEM_10m, CamLocs_dists),
-#          NLCD = raster::extract(NLCD_2016, CamLocs_dists)) -> CamLocs_covs_sf
+record_table <- read.csv("data/Data-21-22_Record_Table.csv") 
 
-CamLocs_dists %>% 
-  mutate(elev = raster::extract(DEM_10m, CamLocs_dists)) -> CamLocs_dists_elev
+livestock_rt <- record_table %>% filter(Species == "Livestock") 
 ```
 
-Creating 50m buffers around cameras
+
 ```{r}
-sites_sf %>% 
-  st_buffer(dist = 50) -> buffers50
+buffers100 <- cameras_shp %>% st_buffer(dist = 100) #create buffers around cameras
+
+buffers100_extract <- buffers100 %>% #extract avg values from buffered area
+                mutate(d_corral = exactextractr::exact_extract(d_corral, buffers100, 'median'),
+                       d_setmt = exactextractr::exact_extract(d_setmt, buffers100, 'median'), 
+                       ndvi = exactextractr::exact_extract(ndvi, buffers100, 'median'),
+                       elev = raster::extract(elevation, cameras_shp),
+                       slope = raster::extract(slope, cameras_shp)) %>% 
+                st_drop_geometry() 
+
+covariates <- buffers100_extract %>% 
+              left_join(prey) %>% 
+              mutate(lvstk_occ = c(0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0))
+covariates
 ```
 
-Now, we want the proportion of forest within the buffer, as well as percent canopy cover
+
+### Write to covariates to camera location file
 ```{r}
-buffers50 %>%
-  mutate(
-    cancov_avg = exactextractr::exact_extract(cancov, buffers50, 'mean'),
-    #can just use the built in function for mean canopy cover
-    forest_prop = exactextractr::exact_extract(NLCD_2016, buffers50,
-                                               function(value, fraction) { #have to use a custom function now to get the proportion covered by any forest type
-                                                 sum(fraction[value == 41 | value == 42 | value == 43], na.rm = TRUE) / sum(fraction, na.rm = TRUE)
-                                               })
-  ) -> buffers50_extract
-
+write.csv(covariates, "data/covariates.csv")
 ```
-
-
-Clean up for land cover (no longer needed)
-```{r}
-# CamLocs_covs_sf %>% 
-#   st_drop_geometry() %>% 
-#   rename(Value = NLCD) %>% 
-#   left_join(NLCD_key) %>% 
-#   select(-Description) %>% 
-#   rename(NLCD_code = Value, NLCD_Class = Class, NLCD_Classification = Classification) %>% 
-#   mutate(is_forest = if_else(NLCD_Class == "Forest", 1, 0)) -> CamLocs_covs
-
-#write.csv(CamLocs_covs, "CamLocs_covs.csv")
-```
-
-Join and clean up
-```{r}
-buffers50_cleaned <- buffers50_extract %>% 
-  st_drop_geometry() %>% 
-  mutate(cancov_avg = cancov_avg/100) #using the scalar from the GNN readme
-
-CamLocs_dists_elev %>% 
-  st_drop_geometry() %>% 
-  left_join(buffers50_cleaned) -> CamLocs_covs
-
-#write.csv(CamLocs_covs, "CamLocs_covs.csv")
-```
-

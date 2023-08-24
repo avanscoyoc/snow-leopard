@@ -5,9 +5,21 @@ date: "9/1/2022"
 output: github_document
 ---
 
+# Libraries
+
+```{r}
+library(tidyverse) # for basic data wrangling
+library(camtrapR) # for creating species record tables
+```
+
 ```{r}
 record_table <- read.csv("data/Data-21-22_Record_Table.csv") #import record table
 camtraps <- read.csv("data/cameratraps.csv") #import camera site locations
+```
+
+```{r}
+#prey
+record_table[record_table$Species == "Ibex" | record_table$Species == "Markhor",] %>% write.csv("data/record_table_prey.csv")
 ```
 
 
@@ -24,7 +36,7 @@ SL_detections <- detectionMaps(CTtable   = camtraps,
                            stationCol    = "Station",
                            speciesCol    = "Species",
                            speciesToShow = "Snow Leopard", #add if number detections
-                           printLabels   = TRUE,
+                           printLabels   = FALSE,
                            richnessPlot  = FALSE, #T if richness for all species
                            speciesPlots  = TRUE, #T if number of detections for one species
                            addLegend     = TRUE)
@@ -44,7 +56,7 @@ camop_no_problem <- cameraOperation(CTtable      = camtraps,
 
 ```{r}
 # create detection history (with trapping effort)
-det_hist <- detectionHistory(recordTable         = record_table,
+det_hist_sl <- detectionHistory(recordTable         = record_table,
                             camOp                = camop_no_problem,
                             stationCol           = "Station",
                             speciesCol           = "Species",
@@ -54,6 +66,8 @@ det_hist <- detectionHistory(recordTable         = record_table,
                             day1                 = "station",
                             includeEffort        = T, #T if trap effort influences detection
                             scaleEffort          = TRUE) #to help with convergence of models
+
+det_hist_sl <- as.data.frame(det_hist_sl) 
 ```
 
 # Occupancy model in unmarked
@@ -64,7 +78,17 @@ library(unmarked)
 
 ### Site covariates
 ```{r}
-site <- 
+library(here)
+covariates <- read_csv(here("data/covariates.csv"))
+
+site <- data.frame(elev = covariates$elvtn_m,
+                   slope = covariates$slope,
+                   d_corral = covariates$d_corral, 
+                   d_setmt = covariates$d_setmt,
+                   ndvi = covariates$ndvi,
+                   prey = covariates$prey_rai,
+                   lvstk_occ = as.factor(covariates$lvstk_occ),
+                   n_days = covariates$n_days)
 ```
 
 ### Detection covariates
@@ -74,13 +98,17 @@ obs <-
 
 ### Create unmarked dataframe
 ```{r}
-wt = unmarkedFrameOccu(y = det_hist, siteCovs = site, obsCovs = obs)
-summary(wt)
+sl_occ <- unmarkedFrameOccu(y = det_hist[,c(1:21)], siteCovs = site)
+summary(sl_occ)
 ``` 
 
 ### Run occupancy model
 ```{r}
-model1 = occu(~ date + dates.2 + mins + mins.2 ~ siteCovs, data = wt)
+cor(covariates[,4:12])
+
+model1 = occu(~n_days + elev ~d_corral + prey + lvstk_occ, data = sl_occ, se = T)
+
+coef(model1, type = "state")
 summary(model1)
 ```
 

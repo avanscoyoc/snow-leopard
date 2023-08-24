@@ -20,7 +20,7 @@ cameras <- read_csv("data/camerasites_2021_2022.csv") %>%
          set_date = as.Date(start, format = "%d/%m/%Y"),
          close_date = as.Date(end, format = "%d/%m/%Y"),
          n_days = close_date - set_date) %>% 
-  select(Station=camera,longitude, latitude, set_date, close_date, n_days, elevation_m)
+  dplyr::select(Station=camera,longitude, latitude, set_date, close_date, n_days, elevation_m)
 ```
 
 
